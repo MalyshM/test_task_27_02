@@ -1,0 +1,6 @@
+/venv
+/scripts/data
+*.env
+*.json
+*.csv
+/.idea
