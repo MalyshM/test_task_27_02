@@ -1,6 +1,8 @@
 import json
-
+from datetime import datetime
 import requests
+import pandas as pd
+import sqlalchemy as sqlalchemy
 
 limit = 100
 gql_format = """query{
@@ -9,23 +11,20 @@ gql_format = """query{
                 edges {
                     node {
                         ...on Repository {
-                            id
                             name
-                            url
-                            forkCount
-                            stargazers {
-                                totalCount
-                            }
                             owner {
                                 login
                             }
-                            description
-                            pushedAt
-                            primaryLanguage {
-                                name
+                            stargazerCount
+                            watchers {
+                              totalCount
                             }
+                            forkCount
                             openIssues: issues(states: OPEN) {
                                 totalCount
+                            }
+                            primaryLanguage {
+                                name
                             }
                         }
                     }
@@ -34,10 +33,33 @@ gql_format = """query{
         }
         """
 
+repo_activity = """
+{
+    repository(owner: "%s", name: "%s") {
+      nameWithOwner
+      defaultBranchRef {
+        name
+        target {
+          ... on Commit {
+            history(since: "%s", until: "%s") {
+              totalCount
+                nodes {
+                  committedDate
+                  author {
+                    name
+                  }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+"""
 
 
 def get_access_token():
-    return "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"
+    return "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"
 
 
 access_token = get_access_token()
@@ -48,16 +70,41 @@ headers = {
     'Authorization': 'bearer {}'.format(access_token),
 }
 gql_stars = gql_format % ("stars:>1000 sort:stars", limit)
+
+repo_activity_true = repo_activity % ("EbookFoundation", "free-programming-books",
+                                      datetime.strptime("2024-02-10", "%Y-%m-%d").strftime(
+                                          "%Y-%m-%dT%H:%M:%S"),
+                                      datetime.strptime("2024-02-28", "%Y-%m-%d").strftime(
+                                          "%Y-%m-%dT%H:%M:%S"))
 s = requests.session()
 s.keep_alive = False  # don't keep the session
 graphql_api = "https://api.github.com/graphql"
 r = requests.post(url=graphql_api, json={"query": gql_stars}, headers=headers, timeout=30)
 print(r.json())
 data = r.json()
+list_of_repos = []
+# print(r.json())
+counter = 1
+for repo in data['data']["search"]['edges']:
+    list_of_repos.append({
+        "name": repo['node']['name'],
+        "owner": repo['node']['owner']['login'],
+        "position_cur": counter,
+        "position_prev": sqlalchemy.sql.null(),
+        "stargazerCount": repo['node']['stargazerCount'],
+        "watcherCount": repo['node']['watchers']['totalCount'],
+        "forkCount": repo['node']['forkCount'],
+        "openIssuesCount": repo['node']['openIssues']['totalCount'],
+        "primaryLanguage":
+            repo['node']['primaryLanguage']['name'] if
+            repo['node']['primaryLanguage'] is not None else sqlalchemy.sql.null()
+    })
+    counter += 1
 
-# Specify the file path where you want to save the JSON file
-file_path = "data.json"
+df = pd.DataFrame(list_of_repos)
+print(df.head())
 
-# Open the file in write mode and save the data as JSON
-with open(file_path, "w") as json_file:
-    json.dump(data, json_file)
+df.to_csv('test.csv', index=False, header=False, sep="_")
+
+# df= pd.read_csv('test.csv')
+# print(df.head())
