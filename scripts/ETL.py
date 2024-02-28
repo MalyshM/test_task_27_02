@@ -37,7 +37,7 @@ gql_format = """query{
 
 
 def get_access_token():
-    return "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"
+    return "asdasdasdasd"
 
 
 access_token = get_access_token()
