@@ -67,12 +67,12 @@ async def add_top_100(first_time: bool):
 
     load_dotenv()
 
-    access_token = os.getenv("GITHUB_TOKEN")
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.113 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
         'Accept-Language': 'zh-CN,zh;q=0.9',
-        'Authorization': 'bearer {}'.format(access_token),
+        'Authorization': 'bearer {}'.format(GITHUB_TOKEN),
     }
     gql_stars = gql_format % ("stars:>1000 sort:stars", limit)
 
