@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: mydatabase
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  app:
+    build: .
+    container_name: test
+    ports:
+      - '8090:80'
+#      python db_utils.py;
+    command: bash -c "python db_utils.py; uvicorn main:app --host 0.0.0.0 --port 80"
+    env_file:
+      - .env
+    volumes:
+      - ./test_task_27_02:/test_task_27_02
+    environment:
+      - PYTHONPATH=/test_task_27_02/test_task_27_02
+    depends_on:
+      - db
+volumes:
+  app_data:
+  grafana_data:
+
+
