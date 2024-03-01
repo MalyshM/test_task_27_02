@@ -72,8 +72,8 @@ async def add_top_100(first_time: bool):
         "openIssuesCount",
         "primaryLanguage"
     ]
-    csv_file_path_curr = 'data/top_100_current.csv'
-    csv_file_path_prev = 'data/top_100_previous.csv'
+    csv_file_path_curr = 'scripts/data/top_100_current.csv'
+    csv_file_path_prev = 'scripts/data/top_100_previous.csv'
     tasks = []
     if first_time:
         for repo in data['data']["search"]['edges']:

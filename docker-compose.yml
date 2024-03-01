@@ -19,10 +19,21 @@ services:
     ports:
       - '8090:80'
 #      python db_utils.py;
-    command: bash -c "python scripts/auto_parser_and_db_fill.py; uvicorn main:app --host 0.0.0.0 --port 80"
+    command: bash -c "uvicorn main:app --host 0.0.0.0 --port 80"
+    volumes:
+      - .:/app
     env_file:
       - .env
     depends_on:
       - db
 
-
+  parser:
+    build: .
+    container_name: test_parser
+    command: bash -c "python auto_parser_and_db_fill.py; "
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db

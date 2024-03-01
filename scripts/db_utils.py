@@ -9,7 +9,7 @@ from models import Repository, RepoActivity
 
 
 def create_db():
-    conn = psycopg2.connect(dbname="postgres", user="postgres", password="admin", host="localhost")
+    conn = psycopg2.connect(dbname="postgres", user="postgres", password="admin", host="db")
     cursor = conn.cursor()
     conn.autocommit = True
     sql = '''DROP DATABASE IF EXISTS test_task_27_02_db;'''
@@ -22,7 +22,7 @@ def create_db():
             CONNECTION LIMIT = -1;'''
     cursor.execute(sql)
     conn = psycopg2.connect(dbname="test_task_27_02_db", user="postgres", password="admin",
-                            host="localhost")
+                            host="db")
     cursor = conn.cursor()
     conn.autocommit = True
     sql1 = '''
@@ -78,7 +78,7 @@ async def tables_exists():
 
 def add_data():
     conn = psycopg2.connect(dbname="test_task_27_02_db", user="postgres", password="admin",
-                            host="localhost")
+                            host="db")
     cur = conn.cursor()
     with open('data/top_100_current.csv', 'r', encoding='utf-8') as csv_file:
         cur.copy_from(csv_file, 'repositories', sep='[', null='NULL')
