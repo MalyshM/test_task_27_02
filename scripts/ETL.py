@@ -1,14 +1,18 @@
 import asyncio
 import json
 from datetime import datetime
+
+import aiohttp
 import requests
 import pandas as pd
 import sqlalchemy as sqlalchemy
 from dotenv import load_dotenv
 import os
 import csv
+from scripts.db_utils import add_data_async, async_session, add_data_async_repo_activity
 
-from scripts.db_utils import add_data_async
+load_dotenv()
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 
 async def add_top_100(first_time: bool):
@@ -41,33 +45,6 @@ async def add_top_100(first_time: bool):
             }
             """
 
-    repo_activity = """
-    {
-        repository(owner: "%s", name: "%s") {
-          nameWithOwner
-          defaultBranchRef {
-            name
-            target {
-              ... on Commit {
-                history(since: "%s", until: "%s") {
-                  totalCount
-                    nodes {
-                      committedDate
-                      author {
-                        name
-                      }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    """
-
-    load_dotenv()
-
-    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.113 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -75,12 +52,6 @@ async def add_top_100(first_time: bool):
         'Authorization': 'bearer {}'.format(GITHUB_TOKEN),
     }
     gql_stars = gql_format % ("stars:>1000 sort:stars", limit)
-
-    repo_activity_true = repo_activity % ("EbookFoundation", "free-programming-books",
-                                          datetime.strptime("2024-02-10", "%Y-%m-%d").strftime(
-                                              "%Y-%m-%dT%H:%M:%S"),
-                                          datetime.strptime("2024-02-28", "%Y-%m-%d").strftime(
-                                              "%Y-%m-%dT%H:%M:%S"))
     s = requests.session()
     s.keep_alive = False  # don't keep the session
     graphql_api = "https://api.github.com/graphql"
@@ -177,6 +148,73 @@ async def add_top_100(first_time: bool):
                 writer.writerow(repo)
     responses = await asyncio.gather(*tasks)
 
+
+async def get_repo_activity_(params):
+    repo_activity = """
+        {
+            repository(owner: "%s", name: "%s") {
+              nameWithOwner
+              defaultBranchRef {
+                name
+                target {
+                  ... on Commit {
+                    history(since: "%s", until: "%s") {
+                      totalCount
+                        nodes {
+                          committedDate
+                          author {
+                            name
+                          }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """
+    repo_activity_true = repo_activity % (params["owner"], params["repo"],
+                                          params["since"].strftime(
+                                              "%Y-%m-%dT%H:%M:%S"),
+                                          params["until"].strftime(
+                                              "%Y-%m-%dT%H:%M:%S"))
+    json_resp = await get_url(repo_activity_true)
+    sub_dict = {}
+    for row in json_resp["data"]["repository"]["defaultBranchRef"]["target"]["history"]["nodes"]:
+        temp_date = row["committedDate"][0:10]
+        if temp_date in sub_dict.keys():
+            sub_dict[temp_date]["commits"] += 1
+            sub_dict[temp_date]["authors"].append(row["author"]["name"])
+        else:
+            sub_dict[temp_date] = {"commits": 1, "authors": [row["author"]['name']]}
+    tasks=[]
+    for key, item in sub_dict.items():
+        task = asyncio.create_task(
+            add_data_async_repo_activity({"date": datetime.strptime(key, "%Y-%m-%d"), "commits": item['commits'],
+                              "authors": list(set(item['authors']))}))
+        tasks.append(task)
+    return await asyncio.gather(*tasks)
+
+
+async def get_url(query):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.113 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Authorization': 'bearer {}'.format(GITHUB_TOKEN),
+    }
+    graphql_api = "https://api.github.com/graphql"
+    timeout = aiohttp.ClientTimeout(total=30)
+    conn = aiohttp.TCPConnector(limit_per_host=20)
+    cookie_jar = aiohttp.CookieJar(unsafe=True)
+    async with aiohttp.ClientSession(trust_env=True, headers=headers, timeout=timeout, connector=conn,
+                                     cookie_jar=cookie_jar) as session:
+        try:
+            async with session.post(graphql_api, json={"query": query}, ssl=False) as response:
+                return await response.json()
+        except Exception as e:
+            print(e)
+            raise e
 # df= pd.read_csv('test.csv')
 # print(df.head())
 # if False==True:

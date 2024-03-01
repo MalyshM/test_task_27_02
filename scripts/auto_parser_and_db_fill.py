@@ -1,6 +1,6 @@
 import asyncio
-from scripts.ETL import add_top_100
-from scripts.db_utils import tables_exists, create_db
+from ETL import add_top_100
+from db_utils import tables_exists, create_db
 
 loop = asyncio.get_event_loop()
 tables_exists = loop.run_until_complete(tables_exists())
