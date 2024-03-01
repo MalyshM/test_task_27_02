@@ -1,5 +1,3 @@
-import asyncio
-import csv
 import os
 
 import psycopg2
@@ -7,7 +5,7 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from models import Repository
+from models import Repository, RepoActivity
 
 
 def create_db():
@@ -20,8 +18,6 @@ def create_db():
             WITH 
             OWNER = postgres
             ENCODING = 'UTF8'
-            LC_COLLATE = 'Russian_Russia.1251'
-            LC_CTYPE = 'Russian_Russia.1251'
             TABLESPACE = pg_default
             CONNECTION LIMIT = -1;'''
     cursor.execute(sql)
@@ -60,20 +56,24 @@ CREATE TABLE repo_activity (
 
 
 async def tables_exists():
-    async with async_session() as session:
-        res = await session.execute("""
-    SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_name = 'repositories'
-    ) AS repositories_exists,
-    EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_name = 'repo_activity'
-    ) AS repo_activity_exists;""")
-        res_true = res.scalars().first()
-        return res_true
+    try:
+
+        async with async_session() as session:
+            res = await session.execute("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_name = 'repositories'
+        ) AS repositories_exists,
+        EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_name = 'repo_activity'
+        ) AS repo_activity_exists;""")
+            res_true = res.scalars().first()
+            return res_true
+    except:
+        return False
 
 
 def add_data():
@@ -98,15 +98,23 @@ async def add_data_async(data: dict):
     return 0
 
 
+async def add_data_async_repo_activity(data: dict):
+    async with async_session() as session:
+        repo = session.add(RepoActivity(date=data["date"], commits=data["commits"], authors=data["authors"]))
+        await session.commit()
+    return {"date": data["date"], "commits": data["commits"], "authors": data["authors"]}
+
+
 async def get_session() -> AsyncSession:
     async with async_session() as session:
         yield session
+
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )

@@ -5,8 +5,9 @@ from fastapi.params import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from scripts.ETL import get_repo_activity_
 from scripts.db_utils import get_session
-from validators.Repo_validators import get_repo_activity_validation
+from validators.Repo_validators import get_repo_activity_validation, top100_validation
 
 router = APIRouter()
 
@@ -30,8 +31,9 @@ router = APIRouter()
                     "primarylanguage": "TypeScript" Основной язык
                   },
             """)
-async def top100(db: AsyncSession = Depends(get_session)):
-    res = await db.execute("""
+async def top100(params: Annotated[dict, Depends(top100_validation)], db: AsyncSession = Depends(get_session)):
+    # C ДАТОЙ БЫЛО БЫ ПРОЩЕ
+    res = await db.execute(f"""
         SELECT *
             FROM (
                 SELECT
@@ -51,7 +53,7 @@ async def top100(db: AsyncSession = Depends(get_session)):
                 LIMIT 100
             ) AS sub_query
             ORDER BY
-                sub_query.position_cur ASC
+                sub_query.{params['order_by']} {params['desc']}
     """)
     return res.fetchall()
 
@@ -69,6 +71,8 @@ async def top100(db: AsyncSession = Depends(get_session)):
             Returns:
                 List[] - массив словарей с полями date, commits,
             """)
-async def get_repo_activity(params: Annotated[dict, Depends(get_repo_activity_validation)]):
-    # Your code here
-    return {"message": f"Fetching activity for /api/repos/{params['owner']}/{params['repo']}/activity"}
+async def get_repo_activity(params: Annotated[dict, Depends(get_repo_activity_validation)],
+                            db: AsyncSession = Depends(get_session)):
+    # БЕЗ ПОЛЕЙ АВТОРА И РЕПЫ НЕ ПОНЯТЬ, ЧТО В БД ЕСТЬ НУЖНЫЕ ДАННЫЕ
+    res = await get_repo_activity_(params)
+    return res
